@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic Parallax Art Visualizer v5</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e24;
+            color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #controls {
+            width: 330px;
+            background: #2b2b36;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            overflow-y: auto;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 { margin-top: 0; font-size: 1.2rem; color: #e5c59a; }
+        h3 { margin-top: 10px; font-size: 1rem; color: #aaa; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;}
+
+        .control-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #ccc; }
+        input[type="range"], select {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #e5c59a;
+        }
+        
+        .color-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .color-group label { margin-bottom: 2px; font-size: 0.8rem;}
+        input[type="color"] {
+            border: 1px solid #444;
+            background: #1e1e24;
+            width: 100%;
+            height: 35px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .value-display { float: right; font-weight: bold; color: #e5c59a; }
+
+        #viewer {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1200px;
+            background: radial-gradient(circle, #3a3a48 0%, #1e1e24 100%);
+            cursor: grab;
+        }
+        
+        #viewer:active { cursor: grabbing; }
+
+        #stage {
+            width: 500px;
+            height: 500px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            filter: drop-shadow(2px 5px 4px rgba(0,0,0,0.4));
+        }
+
+        #export-btn {
+            background-color: #e5c59a;
+            color: #1e1e24;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: auto;
+            transition: background-color 0.2s;
+        }
+
+        #export-btn:hover { background-color: #d4b489; }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <h2>Parallax Settings v5</h2>
+        
+        <div class="control-group">
+            <label>Layout Style</label>
+            <select id="layout">
+                <option value="intersect" selected>Intersecting Flow</option>
+                <option value="vertical">Vertical Flow</option>
+                <option value="horizontal">Horizontal Flow</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Density <span class="value-display" id="val-density">35</span></label>
+            <input type="range" id="density" min="10" max="80" value="35">
+        </div>
+
+        <div class="control-group">
+            <label>Turbulence <span class="value-display" id="val-turbulence">25</span></label>
+            <input type="range" id="turbulence" min="0" max="100" value="25">
+        </div>
+
+        <div class="control-group">
+            <label>Base Angle (Degrees) <span class="value-display" id="val-angle">0</span></label>
+            <input type="range" id="angle" min="-90" max="90" value="0">
+        </div>
+
+        <div class="control-group">
+            <label>Minimum Thickness <span class="value-display" id="val-thickness">4</span></label>
+            <input type="range" id="thickness" min="1" max="15" value="4">
+        </div>
+
+        <div class="control-group">
+            <label>Added Width (Pulse) <span class="value-display" id="val-widthVar">4</span></label>
+            <input type="range" id="widthVar" min="0" max="15" value="4">
+        </div>
+
+        <h3>Physical Structure</h3>
+        <div class="control-group">
+            <label>Patterned Layers <span class="value-display" id="val-patternLayers">3</span></label>
+            <input type="range" id="patternLayers" min="2" max="4" value="3">
+        </div>
+
+        <div class="control-group">
+            <label>Spacers Between Patterns <span class="value-display" id="val-spacers">1</span></label>
+            <input type="range" id="spacers" min="0" max="3" value="1">
+        </div>
+
+        <div class="control-group">
+            <label>Total Moire Phase Shift <span class="value-display" id="val-variation">20</span></label>
+            <input type="range" id="variation" min="0" max="100" value="20">
+        </div>
+
+        <h3>Layer Colors</h3>
+        <div class="color-inputs">
+            <div class="color-group">
+                <label>Solid Base</label>
+                <input type="color" id="color_solidBase" value="#e5c59a">
+            </div>
+            <div class="color-group">
+                <label>Bottom Pattern</label>
+                <input type="color" id="color_patternBottom" value="#d4a36f">
+            </div>
+            <div class="color-group">
+                <label>Middle Pattern(s)</label>
+                <input type="color" id="color_patternMid" value="#cfa06b">
+            </div>
+            <div class="color-group">
+                <label>Top Pattern</label>
+                <input type="color" id="color_patternTop" value="#bf9b68">
+            </div>
+            <div class="color-group" style="grid-column: span 2;">
+                <label>Spacer Frames</label>
+                <input type="color" id="color_spacerFrame" value="#b0865a">
+            </div>
+        </div>
+
+        <button id="export-btn">Export to SVG</button>
+    </div>
+
+    <div id="viewer">
+        <div id="stage"></div>
+    </div>
+
+    <script>
+        const stage = document.getElementById('stage');
+        const viewer = document.getElementById('viewer');
+        const exportBtn = document.getElementById('export-btn');
+        const inputs = ['layout', 'density', 'turbulence', 'angle', 'thickness', 'widthVar', 'patternLayers', 'spacers', 'variation', 'color_solidBase', 'color_patternBottom', 'color_patternMid', 'color_patternTop', 'color_spacerFrame'];
+        
+        const state = {};
+        const canvasSize = 500;
+        const layerDepth = 8; 
+
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                state[id] = el.value;
+                if(document.getElementById(`val-${id}`)) {
+                    document.getElementById(`val-${id}`).innerText = el.value;
+                }
+                generateArt();
+            });
+            state[id] = el.value;
+        });
+
+        let targetRotX = 0, targetRotY = 0;
+        let currentRotX = 0, currentRotY = 0;
+
+        viewer.addEventListener('mousemove', (e) => {
+            const rect = viewer.getBoundingClientRect();
+            targetRotY = ((e.clientX - rect.left) / rect.width - 0.5) * 60;
+            targetRotX = ((e.clientY - rect.top) / rect.height - 0.5) * -60;
+        });
+
+        function animate() {
+            currentRotX += (targetRotX - currentRotX) * 0.1;
+            currentRotY += (targetRotY - currentRotY) * 0.1;
+            stage.style.transform = `rotateX(${currentRotX}deg) rotateY(${currentRotY}deg)`;
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        function generatePolygonFromPath(points) {
+            if (points.length < 2) return null;
+            let leftEdge = [];
+            let rightEdge = [];
+
+            for (let i = 0; i < points.length; i++) {
+                let p1, p2;
+                if (i === 0) { p1 = points[0]; p2 = points[1]; }
+                else if (i === points.length - 1) { p1 = points[i - 1]; p2 = points[i]; }
+                else { p1 = points[i - 1]; p2 = points[i + 1]; }
+
+                let dx = p2.x - p1.x;
+                let dy = p2.y - p1.y;
+                let len = Math.sqrt(dx*dx + dy*dy);
+                if (len === 0) { dx = 1; dy = 0; len = 1; }
+                
+                let nx = -dy / len;
+                let ny = dx / len;
+
+                leftEdge.push({ x: points[i].x + nx * points[i].w, y: points[i].y + ny * points[i].w });
+                rightEdge.push({ x: points[i].x - nx * points[i].w, y: points[i].y - ny * points[i].w });
+            }
+            return { leftEdge, rightEdge };
+        }
+
+        function drawPolygon(ctx, poly) {
+            if (!poly) return;
+            ctx.beginPath();
+            ctx.moveTo(poly.leftEdge[0].x, poly.leftEdge[0].y);
+            for (let i = 1; i < poly.leftEdge.length; i++) ctx.lineTo(poly.leftEdge[i].x, poly.leftEdge[i].y);
+            for (let i = poly.rightEdge.length - 1; i >= 0; i--) ctx.lineTo(poly.rightEdge[i].x, poly.rightEdge[i].y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function getPolygonSVG(poly) {
+            if (!poly) return "";
+            let d = `M ${poly.leftEdge[0].x.toFixed(2)} ${poly.leftEdge[0].y.toFixed(2)} `;
+            for (let i = 1; i < poly.leftEdge.length; i++) d += `L ${poly.leftEdge[i].x.toFixed(2)} ${poly.leftEdge[i].y.toFixed(2)} `;
+            for (let i = poly.rightEdge.length - 1; i >= 0; i--) d += `L ${poly.rightEdge[i].x.toFixed(2)} ${poly.rightEdge[i].y.toFixed(2)} `;
+            d += "Z ";
+            return d;
+        }
+
+        function calculatePaths(phase) {
+            const layout = state.layout;
+            const density = parseInt(state.density);
+            const turbulence = parseInt(state.turbulence);
+            const baseThick = parseInt(state.thickness) / 2;
+            const varThick = parseInt(state.widthVar) / 2;
+            const cx = canvasSize / 2;
+            const cy = canvasSize / 2;
+            const maxDist = Math.sqrt(cx*cx + cy*cy) * 1.5; 
+            const linearStep = 1.5; 
+            let allPaths = [];
+
+            function calculateDisplacement(v, ph) {
+                return Math.sin((v * 0.012) + ph * 1.1) * turbulence * 1.2 + Math.sin((v * 0.033) - ph * 0.4) * (turbulence * 0.4);
+            }
+            function calculateWidth(v, ph) {
+                const pulseSine = (Math.sin((v * 0.02) + ph) + 1) / 2; 
+                return baseThick + (pulseSine * varThick);
+            }
+
+            if (layout === 'vertical' || layout === 'intersect') {
+                const step = canvasSize / density;
+                for (let x = -maxDist; x <= canvasSize + maxDist; x += step) {
+                    let points = [];
+                    let currentX = x + (layout === 'intersect' ? (Math.random() - 0.5) * step * 0.2 : 0);
+                    for (let y = -maxDist; y <= canvasSize + maxDist; y += linearStep) {
+                        points.push({ x: currentX + calculateDisplacement(y, phase), y: y, w: calculateWidth(y, phase) });
+                    }
+                    allPaths.push(points);
+                }
+            } 
+
+            if (layout === 'horizontal' || layout === 'intersect') {
+                const step = canvasSize / density;
+                for (let y = -maxDist; y <= canvasSize + maxDist; y += step) {
+                    let points = [];
+                    let currentY = y + (layout === 'intersect' ? (Math.random() - 0.5) * step * 0.2 : 0);
+                    for (let x = -maxDist; x <= canvasSize + maxDist; x += linearStep) {
+                        points.push({ x: x, y: currentY + calculateDisplacement(x, phase), w: calculateWidth(x, phase) });
+                    }
+                    allPaths.push(points);
+                }
+            }
+
+            const angleRad = parseInt(state.angle) * (Math.PI / 180);
+            if (angleRad !== 0) {
+                allPaths.forEach(path => path.forEach(pt => {
+                    const nx = Math.cos(angleRad) * (pt.x - cx) - Math.sin(angleRad) * (pt.y - cy) + cx;
+                    const ny = Math.sin(angleRad) * (pt.x - cx) + Math.cos(angleRad) * (pt.y - cy) + cy;
+                    pt.x = nx; pt.y = ny;
+                }));
+            }
+            return allPaths;
+        }
+
+        // --- Z-Stack Rendering Logic ---
+        function generateArt() {
+            stage.innerHTML = ''; 
+            const patternLayers = parseInt(state.patternLayers);
+            const spacers = parseInt(state.spacers);
+            const thickness = parseInt(state.thickness);
+            
+            // 1. Draw solid background layer at Z=0
+            const baseCanvas = document.createElement('canvas');
+            baseCanvas.width = canvasSize;
+            baseCanvas.height = canvasSize;
+            baseCanvas.style.transform = `translateZ(0px)`;
+            stage.appendChild(baseCanvas);
+            const baseCtx = baseCanvas.getContext('2d');
+            baseCtx.fillStyle = state.color_solidBase;
+            baseCtx.fillRect(0, 0, canvasSize, canvasSize);
+
+            let currentZIndex = 1;
+
+            // 2. Iterate through Patterned Layers
+            for (let p = 0; p < patternLayers; p++) {
+                // Determine Phase Shift & Color for this specific patterned layer
+                const progress = p / (patternLayers - 1); // 0.0 to 1.0
+                const phaseShift = progress * (parseFloat(state.variation) / 10);
+                
+                let layerColor = state.color_patternMid;
+                if (p === 0) layerColor = state.color_patternBottom;
+                if (p === patternLayers - 1) layerColor = state.color_patternTop;
+
+                // Draw Pattern Layer
+                const pCanvas = document.createElement('canvas');
+                pCanvas.width = canvasSize;
+                pCanvas.height = canvasSize;
+                pCanvas.style.transform = `translateZ(${currentZIndex * layerDepth}px)`; 
+                stage.appendChild(pCanvas);
+                
+                const pCtx = pCanvas.getContext('2d');
+                pCtx.fillStyle = layerColor;
+                
+                // Outer Frame
+                pCtx.fillRect(0, 0, canvasSize, thickness); 
+                pCtx.fillRect(0, canvasSize - thickness, canvasSize, thickness); 
+                pCtx.fillRect(0, 0, thickness, canvasSize); 
+                pCtx.fillRect(canvasSize - thickness, 0, thickness, canvasSize); 
+
+                pCtx.save();
+                pCtx.beginPath();
+                pCtx.rect(0, 0, canvasSize, canvasSize);
+                pCtx.clip();
+
+                const paths = calculatePaths(phaseShift);
+                paths.forEach(points => drawPolygon(pCtx, generatePolygonFromPath(points)));
+                pCtx.restore();
+
+                currentZIndex++;
+
+                // Draw Spacer Frames immediately after this pattern (unless it's the very top pattern)
+                if (p < patternLayers - 1) {
+                    for (let s = 0; s < spacers; s++) {
+                        const sCanvas = document.createElement('canvas');
+                        sCanvas.width = canvasSize;
+                        sCanvas.height = canvasSize;
+                        sCanvas.style.transform = `translateZ(${currentZIndex * layerDepth}px)`; 
+                        stage.appendChild(sCanvas);
+
+                        const sCtx = sCanvas.getContext('2d');
+                        sCtx.fillStyle = state.color_spacerFrame;
+                        sCtx.fillRect(0, 0, canvasSize, thickness); 
+                        sCtx.fillRect(0, canvasSize - thickness, canvasSize, thickness); 
+                        sCtx.fillRect(0, 0, thickness, canvasSize); 
+                        sCtx.fillRect(canvasSize - thickness, 0, thickness, canvasSize); 
+                        
+                        currentZIndex++;
+                    }
+                }
+            }
+        }
+
+        // --- Multi-Layer SVG EXPORT ---
+        exportBtn.addEventListener('click', () => {
+            const patternLayers = parseInt(state.patternLayers);
+            const spacers = parseInt(state.spacers);
+            const thick = parseInt(state.thickness);
+            
+            const offsetWidth = canvasSize + 50;
+            // Total columns = Base (1) + Pattern Layers (N) + Spacer Template (1 if spacers > 0 else 0)
+            const hasSpacers = spacers > 0 ? 1 : 0;
+            const totalWidth = offsetWidth * (1 + patternLayers + hasSpacers); 
+
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${canvasSize}" width="${totalWidth}mm" height="${canvasSize}mm">\n`;
+            svg += `<defs><clipPath id="frameClip"><rect x="0" y="0" width="${canvasSize}" height="${canvasSize}" /></clipPath></defs>\n\n`;
+
+            const getFrame = () => {
+                let p = `<rect x="0" y="0" width="${canvasSize}" height="${thick}" />\n`;
+                p += `    <rect x="0" y="${canvasSize - thick}" width="${canvasSize}" height="${thick}" />\n`;
+                p += `    <rect x="0" y="0" width="${thick}" height="${canvasSize}" />\n`;
+                p += `    <rect x="${canvasSize - thick}" y="0" width="${thick}" height="${canvasSize}" />\n`;
+                return p;
+            };
+
+            let currentColumn = 0;
+
+            // 1. Solid Base Layer
+            svg += `<g id="SolidBase" fill="${state.color_solidBase}" stroke="none" transform="translate(${currentColumn * offsetWidth}, 0)">\n`;
+            svg += `  <rect x="0" y="0" width="${canvasSize}" height="${canvasSize}" />\n`;
+            svg += `</g>\n\n`;
+            currentColumn++;
+
+            // 2. Export All Patterned Layers Left-to-Right
+            for (let p = 0; p < patternLayers; p++) {
+                const progress = p / (patternLayers - 1);
+                const phaseShift = progress * (parseFloat(state.variation) / 10);
+                
+                let layerColor = state.color_patternMid;
+                let layerName = `Pattern_Mid_${p}`;
+                if (p === 0) { layerColor = state.color_patternBottom; layerName = "Pattern_Bottom"; }
+                if (p === patternLayers - 1) { layerColor = state.color_patternTop; layerName = "Pattern_Top"; }
+
+                const pPaths = calculatePaths(phaseShift);
+                svg += `<g id="${layerName}" fill="${layerColor}" stroke="none" transform="translate(${currentColumn * offsetWidth}, 0)">\n`;
+                svg += `  ${getFrame()}<g clip-path="url(#frameClip)">\n`;
+                pPaths.forEach(pts => svg += `    <path d="${getPolygonSVG(generatePolygonFromPath(pts))}" />\n`);
+                svg += `  </g></g>\n\n`;
+                
+                currentColumn++;
+            }
+
+            // 3. Spacer Template (Only export if the user actually requested spacers)
+            if (hasSpacers) {
+                const totalSpacersNeeded = spacers * (patternLayers - 1);
+                svg += `<g id="SpacerTemplate" fill="${state.color_spacerFrame}" stroke="none" transform="translate(${currentColumn * offsetWidth}, 0)">\n`;
+                svg += `  ${getFrame()}`;
+                svg += `  <text x="${canvasSize/2}" y="${canvasSize/2}" fill="${state.color_spacerFrame}" stroke="none" text-anchor="middle" font-family="sans-serif" font-size="20">Cut ${totalSpacersNeeded} Spacer(s)</text>\n`;
+                svg += `</g>\n\n`;
+            }
+
+            svg += `</svg>`;
+
+            const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+            const a = document.createElement('a'); a.href = url; a.download = `Parallax_v5_${patternLayers}Layers.svg`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        });
+
+        generateArt();
+    </script>
+</body>
+</html>
